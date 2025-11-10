@@ -1,0 +1,4 @@
+Screenshot idea: show the login form with email and password fields.
+Add a "Remember me" checkbox and a bright sign in button.
+Background can keep the soft product gradient so it looks friendly.
+

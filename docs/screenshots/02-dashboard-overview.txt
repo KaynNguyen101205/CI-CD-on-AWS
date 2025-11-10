@@ -1,0 +1,4 @@
+Screenshot idea: show the dashboard after login with KPI cards on top.
+Put a line chart on the right and an activity feed under the cards.
+Use mock numbers that look realistic but not too perfect.
+

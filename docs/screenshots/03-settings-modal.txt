@@ -1,0 +1,4 @@
+Screenshot idea: show the profile settings modal with avatar preview.
+Include display name input, language dropdown, and save button in view.
+Keep the modal centered so it feels calm and easy to read.
+

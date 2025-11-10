@@ -88,3 +88,10 @@ ansible -i inventory.yaml jenkins -m ping
 
 Expected output: `"ping": "pong"` and `SUCCESS`. If it fails with `UNREACHABLE`, check that the security group allows your IP and the instance is running.
 
+## Documentation bundle (DOC-01)
+
+- Drop screenshots into `docs/screenshots/` using the suggested names from `docs/metrics.md`.
+- After each successful Jenkins build copy the generated `metrics/image-size.csv` into the repo and append a short note in `docs/metrics.md`.
+- Include Terraform apply, Ansible playbook recaps, Jenkins pipeline, Docker Hub tags, app homepage, and locked-down security group in the screenshot set.
+- When updating docs keep the explanations in plain English (IELTS 6.5 level) so the story stays easy to read.
+
