@@ -1,6 +1,6 @@
 locals {
   terraform_private_key_path = "${path.module}/jenkinscicd.pem"
-  terraform_public_key_path  = "${path.module}/jenkinscicd.pem.pub"
+  terraform_public_key_path  = var.ssh_public_key_path != "" ? (substr(var.ssh_public_key_path, 0, 1) == "/" ? var.ssh_public_key_path : "${path.module}/${var.ssh_public_key_path}") : "${path.module}/jenkinscicd.pem.pub"
   ansible_private_key_path   = "${path.module}/../ansible/jenkinscicd.pem"
 }
 

@@ -18,4 +18,6 @@ backlog_all_tasks.csv
 *.log
 .DS_Store
 Thumbs.db
+terraform/terraform.tfvars
+terraform/terraform.tfvars.json
 

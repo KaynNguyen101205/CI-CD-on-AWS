@@ -1,6 +1,6 @@
 # Personal Project Infrastructure Bootstrap
 
-This repository now includes the Terraform scaffolding to get the Jenkins lab ready and to automate the SSH keypair requested in tasks T0-01 and T0-02.
+This repository now includes the Terraform scaffolding to get the Jenkins lab ready and to automate the SSH keypair requested in tasks T0-01 through TF-02.
 
 ## Terraform backend (T0-01)
 
@@ -37,9 +37,40 @@ Afterwards double-check the permissions (WSL and Linux respect the `file_permiss
 
 The path to the public key is defined in `variables.tf` (`ssh_public_key_path`) so later modules can reference it when creating the EC2 key pair.
 
-## Next steps
+## Variable setup (TF-01)
 
-- Fill in `aws_region`, `aws_availability_zone`, and other variables in `terraform/variables.tf`.
-- When you are ready to switch to an S3 backend, create the bucket first (`aws s3 mb`) and migrate the state as mentioned above.
-- Proceed to backlog item `TF-01` once the keypair exists and Terraform init completes cleanly.
+1. Copy `terraform/terraform.tfvars.example` to `terraform/terraform.tfvars`.
+2. Change `aws_region`, `aws_availability_zone`, and `allowed_cidr_ipv4` to match your account and laptop IP (`/32` mask only).
+3. Keep `instance_type = "t2.micro"` and `root_volume_size = 20` to stay inside the free tier plan.
+4. Run:
+
+```
+cd terraform
+terraform validate
+```
+
+If `terraform validate` complains about the IP format, re-check that it ends with `/32` (for example `198.51.100.24/32`).
+
+## Provision Jenkins host (TF-02)
+
+With the variables in place you can create the real infrastructure:
+
+```
+cd terraform
+terraform plan
+terraform apply
+```
+
+The plan should show a new EC2 instance, a security group with two ingress rules (22 and 8080 to your `/32`), and the Jenkins key pair. After `terraform apply` finishes, note the outputs:
+
+- `jenkins_public_ip`
+- `jenkins_public_dns`
+
+You will use these values in the Ansible inventory during `ANS-01`.
+
+## Validation and cleanup
+
+- Confirm the EC2 instance exists in the AWS console and sits in the AZ you picked.
+- From your laptop run `nc -vz <public_ip> 22` and `nc -vz <public_ip> 8080` to be sure only these ports are open.
+- When you are done experimenting, run `terraform destroy` from the `terraform` directory to avoid extra charges.
 
