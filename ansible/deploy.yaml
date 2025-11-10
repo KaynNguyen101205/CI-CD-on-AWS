@@ -1,0 +1,61 @@
+---
+- name: Deploy Next.js container
+  hosts: jenkins
+  become: true
+  gather_facts: false
+
+  vars:
+    app_name: sample-next-app
+    container_name: sample-next-app
+    docker_image: "{{ image | default('your-dockerhub-username/sample-next-app:latest') }}"
+    app_port: "{{ port | default(3000) }}"
+
+  tasks:
+    - name: Ensure Docker is installed
+      ansible.builtin.command: docker --version
+      changed_when: false
+
+    - name: Pull container image
+      community.docker.docker_image:
+        name: "{{ docker_image }}"
+        source: pull
+
+    - name: Stop existing container if running
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        state: stopped
+      ignore_errors: true
+
+    - name: Remove old container
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        state: absent
+      ignore_errors: true
+
+    - name: Run updated container
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        image: "{{ docker_image }}"
+        restart_policy: always
+        published_ports:
+          - "{{ app_port }}:3000"
+        env:
+          PORT: "3000"
+        state: started
+
+    - name: Wait for HTTP service to come up
+      ansible.builtin.uri:
+        url: "http://{{ hostvars[inventory_hostname].ansible_host }}:{{ app_port }}"
+        status_code: 200
+        timeout: 5
+      register: web_health
+      retries: 10
+      delay: 6
+      until: web_health.status == 200
+
+    - name: Show deployment result
+      ansible.builtin.debug:
+        msg:
+          - "Container {{ container_name }} running image {{ docker_image }}"
+          - "Reach it via http://{{ hostvars[inventory_hostname].ansible_host }}:{{ app_port }}"
+
