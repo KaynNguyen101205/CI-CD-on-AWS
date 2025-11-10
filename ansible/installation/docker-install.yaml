@@ -1,0 +1,113 @@
+---
+- name: Install Docker CE for Jenkins host
+  hosts: jenkins
+  become: true
+  gather_facts: true
+
+  vars:
+    docker_repo_key_url: https://download.docker.com/linux/ubuntu/gpg
+    docker_repo_arch: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
+    docker_repo_line: "deb [arch={{ docker_repo_arch }} signed-by={{ docker_key_path }}] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    docker_key_path: /usr/share/keyrings/docker-archive-keyring.asc
+    docker_packages:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    docker_prereq_packages:
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+
+  pre_tasks:
+    - name: Check target OS is Debian family
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] == "Debian"
+        fail_msg: "This playbook needs an Ubuntu or Debian host."
+        success_msg: "Host looks ready for Docker install."
+      tags: always
+
+  tasks:
+    - name: Install package pre-requisites
+      ansible.builtin.apt:
+        name: "{{ docker_prereq_packages }}"
+        state: present
+        update_cache: true
+      tags: packages
+
+    - name: Create directory for keyring
+      ansible.builtin.file:
+        path: "{{ docker_key_path | dirname }}"
+        state: directory
+        mode: "0755"
+      tags: repo
+
+    - name: Download Docker apt GPG key
+      ansible.builtin.get_url:
+        url: "{{ docker_repo_key_url }}"
+        dest: "{{ docker_key_path }}"
+        mode: "0644"
+      tags: repo
+
+    - name: Add Docker apt repository
+      ansible.builtin.apt_repository:
+        repo: "{{ docker_repo_line }}"
+        filename: docker
+        state: present
+      register: docker_repo_result
+      tags: repo
+
+    - name: Update apt cache after adding Docker repo
+      ansible.builtin.apt:
+        update_cache: true
+      when: docker_repo_result.changed
+      tags: repo
+
+    - name: Install Docker packages
+      ansible.builtin.apt:
+        name: "{{ docker_packages }}"
+        state: present
+      notify: Restart Docker service
+      tags: packages
+
+    - name: Ensure Docker service is enabled and running
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+      tags: service
+
+    - name: Add jenkins user to docker group
+      ansible.builtin.user:
+        name: jenkins
+        groups: docker
+        append: true
+      notify: Restart Jenkins service
+      tags: perms
+
+    - name: Check docker command works
+      ansible.builtin.command: docker version --format '{{ "{{.Server.Version}}" }}'
+      register: docker_version
+      changed_when: false
+      failed_when: docker_version.rc != 0
+      tags: verify
+
+    - name: Show Docker server version
+      ansible.builtin.debug:
+        msg: "Docker server version on host: {{ docker_version.stdout }}"
+      tags: verify
+
+  handlers:
+    - name: Restart Docker service
+      ansible.builtin.service:
+        name: docker
+        state: restarted
+
+    - name: Restart Jenkins service
+      ansible.builtin.service:
+        name: jenkins
+        state: restarted
+
