@@ -8,3 +8,8 @@ output "jenkins_public_dns" {
   value       = aws_instance.jenkins.public_dns
 }
 
+output "jenkins_instance_id" {
+  description = "Instance ID of the Jenkins EC2 instance, useful for stop/start scripts."
+  value       = aws_instance.jenkins.id
+}
+

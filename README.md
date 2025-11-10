@@ -74,6 +74,31 @@ You will use these values in the Ansible inventory during `ANS-01`.
 - From your laptop run `nc -vz <public_ip> 22` and `nc -vz <public_ip> 8080` to be sure only these ports are open.
 - When you are done experimenting, run `terraform destroy` from the `terraform` directory to avoid extra charges.
 
+## Cost control and teardown (CLEAN-01)
+
+- When you pause the lab, stop the EC2 instance so it does not burn hours:
+
+  ```
+  ./scripts/stop-jenkins.sh
+  ```
+
+- When you need Jenkins again, start it back up:
+
+  ```
+  ./scripts/start-jenkins.sh
+  ```
+
+  The scripts read the instance id from `terraform output`. Export `AWS_PROFILE=your-profile` first if you use a named profile.
+
+- After you finish the project, destroy every resource so the account is clean:
+
+  ```
+  cd terraform
+  terraform destroy
+  ```
+
+  Run this only once you are ready to remove the instance, key pair, and security group.
+
 ## Populate Ansible inventory (ANS-01)
 
 1. Copy the Terraform output value for `jenkins_public_dns`.
@@ -93,5 +118,5 @@ Expected output: `"ping": "pong"` and `SUCCESS`. If it fails with `UNREACHABLE`,
 - Drop screenshots into `docs/screenshots/` using the suggested names from `docs/metrics.md`.
 - After each successful Jenkins build copy the generated `metrics/image-size.csv` into the repo and append a short note in `docs/metrics.md`.
 - Include Terraform apply, Ansible playbook recaps, Jenkins pipeline, Docker Hub tags, app homepage, and locked-down security group in the screenshot set.
-- When updating docs keep the explanations in plain English (IELTS 6.5 level) so the story stays easy to read.
+
 
