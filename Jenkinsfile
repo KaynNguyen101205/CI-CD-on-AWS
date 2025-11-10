@@ -7,8 +7,8 @@ pipeline {
   parameters {
     string(
       name: 'IMAGE_REPO',
-      defaultValue: 'your-dockerhub-username/sample-next-app',
-      description: 'Docker Hub repository in username/name form'
+      defaultValue: 'KaynNguyen101205/samplenextjsapp',
+      description: 'Docker Hub repository in KaynNguyen101205/samplenextjsapp form'
     )
     string(
       name: 'APP_VERSION',
