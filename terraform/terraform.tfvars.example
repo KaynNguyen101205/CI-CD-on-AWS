@@ -1,11 +1,8 @@
-
-
 aws_profile             = "default"
 aws_region              = "us-east-1"
 aws_availability_zone   = "us-east-1a"
 instance_type           = "t2.micro"
 root_volume_size        = 20
-# Change this to your real public IP with /32 mask, for example 198.51.100.24/32.
 allowed_cidr_ipv4       = "203.0.113.10/32"
 ssh_key_name            = "jenkinscicd"
 ssh_public_key_path     = "jenkinscicd.pem.pub"

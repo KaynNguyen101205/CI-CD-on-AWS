@@ -74,3 +74,17 @@ You will use these values in the Ansible inventory during `ANS-01`.
 - From your laptop run `nc -vz <public_ip> 22` and `nc -vz <public_ip> 8080` to be sure only these ports are open.
 - When you are done experimenting, run `terraform destroy` from the `terraform` directory to avoid extra charges.
 
+## Populate Ansible inventory (ANS-01)
+
+1. Copy the Terraform output value for `jenkins_public_dns`.
+2. Edit `ansible/inventory.yaml` and replace `replace-with-public-dns` with the real DNS or IP.
+3. Make sure the private key copied earlier now exists at `ansible/jenkinscicd.pem` with `chmod 400`.
+4. Run the connectivity check:
+
+```
+cd ansible
+ansible -i inventory.yaml jenkins -m ping
+```
+
+Expected output: `"ping": "pong"` and `SUCCESS`. If it fails with `UNREACHABLE`, check that the security group allows your IP and the instance is running.
+
