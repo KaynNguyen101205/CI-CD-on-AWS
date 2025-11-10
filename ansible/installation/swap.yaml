@@ -1,0 +1,81 @@
+---
+- name: Add swap space for Jenkins host
+  hosts: jenkins
+  become: true
+  gather_facts: true
+
+  vars:
+    swap_file_path: /swapfile
+    swap_file_size_mb: 2048
+
+  pre_tasks:
+    - name: Check this is a Linux system before swap steps
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['system'] == "Linux"
+        fail_msg: "Swap playbook only works on Linux hosts."
+        success_msg: "Host is Linux, swap steps can run."
+      tags: always
+
+  tasks:
+    - name: Look for active swap devices
+      ansible.builtin.command: swapon --noheadings --show=NAME
+      register: active_swap
+      failed_when: false
+      changed_when: false
+
+    - name: Get swap file facts
+      ansible.builtin.stat:
+        path: "{{ swap_file_path }}"
+      register: swap_file_stat
+
+    - name: Create empty swap file when missing
+      ansible.builtin.command: fallocate -l {{ swap_file_size_mb }}M {{ swap_file_path }}
+      when: not swap_file_stat.stat.exists
+
+    - name: Secure swap file permissions
+      ansible.builtin.file:
+        path: "{{ swap_file_path }}"
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Mark swap area when first created
+      ansible.builtin.command: mkswap {{ swap_file_path }}
+      when: not swap_file_stat.stat.exists
+      register: mkswap_result
+      changed_when: mkswap_result.rc == 0
+
+    - name: Touch marker file after mkswap
+      ansible.builtin.file:
+        path: "{{ swap_file_path }}.mkswap"
+        state: touch
+        mode: "0644"
+      when: mkswap_result is defined and mkswap_result.rc == 0
+
+    - name: Enable swap if not active yet
+      ansible.builtin.command: swapon {{ swap_file_path }}
+      when: swap_file_path not in active_swap.stdout_lines
+
+    - name: Make swap permanent in fstab
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        regex: "^{{ swap_file_path | regex_escape }}\\s"
+        line: "{{ swap_file_path }} none swap sw 0 0"
+        state: present
+      notify: Refresh swap entry
+
+    - name: Show swap summary
+      ansible.builtin.command: swapon --show
+      register: swap_summary
+      changed_when: false
+
+    - name: Print swap summary for logs
+      ansible.builtin.debug:
+        msg: "{{ swap_summary.stdout_lines }}"
+
+  handlers:
+    - name: Refresh swap entry
+      ansible.builtin.command: swapon --show
+      changed_when: false
+

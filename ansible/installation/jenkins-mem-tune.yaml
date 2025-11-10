@@ -1,0 +1,87 @@
+---
+- name: Tune Jenkins memory and executors for tiny host
+  hosts: jenkins
+  become: true
+  gather_facts: true
+
+  vars:
+    jenkins_defaults_file: /etc/default/jenkins
+    jenkins_java_options: '-Djava.awt.headless=true -Xms256m -Xmx512m -XX:+UseG1GC'
+    jenkins_init_dir: /var/lib/jenkins/init.groovy.d
+    jenkins_init_script: 01-set-executors.groovy
+
+  pre_tasks:
+    - name: Confirm Jenkins package is installed
+      ansible.builtin.package_facts:
+        manager: auto
+
+    - name: Fail early if Jenkins missing
+      ansible.builtin.assert:
+        that:
+          - "'jenkins' in ansible_facts.packages"
+        fail_msg: "Jenkins package not installed yet. Run installation playbook first."
+        success_msg: "Jenkins package present, tuning can continue."
+
+  tasks:
+    - name: Check if Jenkins defaults backup exists
+      ansible.builtin.stat:
+        path: "{{ jenkins_defaults_file }}.bak"
+      register: jenkins_defaults_backup
+
+    - name: Backup Jenkins defaults before edits
+      ansible.builtin.copy:
+        src: "{{ jenkins_defaults_file }}"
+        dest: "{{ jenkins_defaults_file }}.bak"
+        remote_src: true
+        mode: "0644"
+      when:
+        - jenkins_defaults_file is file
+        - not jenkins_defaults_backup.stat.exists
+
+    - name: Set JAVA_ARGS for small heap
+      ansible.builtin.lineinfile:
+        path: "{{ jenkins_defaults_file }}"
+        regexp: '^JAVA_ARGS='
+        line: 'JAVA_ARGS="{{ jenkins_java_options }}"'
+        create: true
+      notify: Restart Jenkins service
+
+    - name: Set JENKINS_JAVA_OPTIONS as backup
+      ansible.builtin.lineinfile:
+        path: "{{ jenkins_defaults_file }}"
+        regexp: '^JENKINS_JAVA_OPTIONS='
+        line: 'JENKINS_JAVA_OPTIONS="{{ jenkins_java_options }}"'
+        create: yes
+        insertafter: '^JAVA_ARGS='
+      notify: Restart Jenkins service
+
+    - name: Ensure init.groovy.d directory exists
+      ansible.builtin.file:
+        path: "{{ jenkins_init_dir }}"
+        state: directory
+        owner: jenkins
+        group: jenkins
+        mode: "0755"
+
+    - name: Deploy executor tuning groovy script
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/jenkins/set-executors.groovy"
+        dest: "{{ jenkins_init_dir }}/{{ jenkins_init_script }}"
+        owner: jenkins
+        group: jenkins
+        mode: "0644"
+      notify: Restart Jenkins service
+
+    - name: Wait for Jenkins to respond
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 8080
+        delay: 5
+        timeout: 180
+
+  handlers:
+    - name: Restart Jenkins service
+      ansible.builtin.service:
+        name: jenkins
+        state: restarted
+
