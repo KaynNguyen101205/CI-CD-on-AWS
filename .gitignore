@@ -1,0 +1,21 @@
+# Terraform state and working directories
+.terraform/
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+
+# Generated SSH keys
+terraform/jenkinscicd.pem
+terraform/jenkinscicd.pem.pub
+ansible/jenkinscicd.pem
+
+# Local documents and trackers
+CI-CD_AWS_Free_Tier_Guide.pdf
+Personal\ prj.pdf
+backlog_all_tasks.csv
+
+# Local environment noise
+*.log
+.DS_Store
+Thumbs.db
+
