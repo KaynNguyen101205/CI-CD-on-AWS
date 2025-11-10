@@ -1,0 +1,139 @@
+---
+- name: Install Jenkins controller on Ubuntu
+  hosts: jenkins
+  become: true
+  gather_facts: true
+
+  vars:
+    jenkins_http_port: 8080
+    jenkins_repo_key_url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+    jenkins_repo_line: "deb [signed-by={{ jenkins_keyring_path }}] https://pkg.jenkins.io/debian-stable binary/"
+    jenkins_keyring_path: /usr/share/keyrings/jenkins-archive-keyring.asc
+    jenkins_dependency_packages:
+      - ca-certificates
+      - fontconfig
+      - gnupg
+      - apt-transport-https
+      - openjdk-17-jdk
+
+  pre_tasks:
+    - name: Check the target OS family is Debian
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] == "Debian"
+        fail_msg: "This playbook expects an Ubuntu or Debian host."
+        success_msg: "OS family looks good for Jenkins install."
+      tags: always
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      changed_when: false
+      when: ansible_facts['pkg_mgr'] == "apt"
+      tags: always
+
+  tasks:
+    - name: Install base packages that Jenkins needs
+      ansible.builtin.apt:
+        name: "{{ jenkins_dependency_packages }}"
+        state: present
+      when: ansible_facts['pkg_mgr'] == "apt"
+      tags: packages
+
+    - name: Download Jenkins repository key
+      ansible.builtin.get_url:
+        url: "{{ jenkins_repo_key_url }}"
+        dest: "{{ jenkins_keyring_path }}"
+        mode: "0644"
+      tags: repo
+
+    - name: Add Jenkins apt repository
+      ansible.builtin.apt_repository:
+        repo: "{{ jenkins_repo_line }}"
+        filename: jenkins
+        state: present
+      register: jenkins_repo_file_result
+      tags: repo
+
+    - name: Refresh apt cache after adding Jenkins repo
+      ansible.builtin.apt:
+        update_cache: true
+      when: jenkins_repo_file_result.changed
+      tags: repo
+
+    - name: Install Jenkins package
+      ansible.builtin.apt:
+        name: jenkins
+        state: present
+      when: ansible_facts['pkg_mgr'] == "apt"
+      notify: Restart Jenkins service
+      tags: packages
+
+    - name: Ensure Jenkins service is enabled and running
+      ansible.builtin.service:
+        name: jenkins
+        enabled: true
+        state: started
+      tags: service
+
+    - name: Wait for Jenkins HTTP port to answer
+      ansible.builtin.wait_for:
+        port: "{{ jenkins_http_port }}"
+        state: started
+        delay: 5
+        timeout: 300
+      tags: service
+
+    - name: Wait until Jenkins creates the initial admin password file
+      ansible.builtin.wait_for:
+        path: /var/lib/jenkins/secrets/initialAdminPassword
+        state: present
+        delay: 2
+        timeout: 120
+      tags: service
+
+    - name: Read Jenkins initial admin password
+      ansible.builtin.command: cat /var/lib/jenkins/secrets/initialAdminPassword
+      register: jenkins_initial_password_cmd
+      changed_when: false
+      tags: password
+
+    - name: Compute Jenkins public URL from Ansible inventory data
+      ansible.builtin.set_fact:
+        jenkins_public_url: "http://{{ hostvars[inventory_hostname].ansible_host | default(ansible_facts['default_ipv4']['address']) }}:{{ jenkins_http_port }}"
+      tags: password
+
+    - name: Ensure secrets folder exists on control node
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/../secrets"
+        state: directory
+        mode: "0700"
+      delegate_to: localhost
+      run_once: true
+      tags: password
+
+    - name: Save Jenkins initial admin password locally
+      ansible.builtin.copy:
+        dest: "{{ playbook_dir }}/../secrets/jenkins-initial-admin-password.txt"
+        content: |
+          Jenkins URL: {{ jenkins_public_url }}
+          Initial admin password: {{ jenkins_initial_password_cmd.stdout }}
+        mode: "0600"
+      delegate_to: localhost
+      run_once: true
+      tags: password
+
+    - name: Show Jenkins URL and initial password on screen
+      ansible.builtin.debug:
+        msg:
+          - "Jenkins URL: {{ jenkins_public_url }}"
+          - "Initial admin password: {{ jenkins_initial_password_cmd.stdout }}"
+      tags: password
+
+  handlers:
+    - name: Restart Jenkins service
+      ansible.builtin.service:
+        name: jenkins
+        state: restarted
+
