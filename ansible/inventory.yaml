@@ -1,7 +1,6 @@
 all:
   hosts:
     jenkins:
-      # Replace with the Jenkins server DNS name like ec2-1-2-3-4.compute.amazonaws.com
       ansible_host: replace-with-public-dns
       ansible_user: ubuntu
       ansible_ssh_private_key_file: "{{ playbook_dir }}/jenkinscicd.pem"
